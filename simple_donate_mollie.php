@@ -21,18 +21,71 @@ class Simple_Donate_Mollie extends WP_Widget {
 		);
 	}
 
-	private function handle_return($args, $instance)
+	private function connect($instance)
 	{
-		extract($args);
-		$iDeal = new Mollie_iDEAL_Payment($instance['partner_id']);
-		$iDeal->checkPayment($_GET['transaction_id']);
-		if ($iDeal->getPaidStatus())
-			echo "<p>" . $instance['thanks'] . "</p>";
-		else
-			echo "<p>" . $instance['sorry'] . "</p>";
-
-
+		$this->conn = new Mollie_iDEAL_Payment($instance['partner_id']);
+		if ($instance['debug'])
+			$this->conn->setTestMode();
 	}
+
+	private function handle_return($instance)
+	{
+		$this->connect($instance);
+		$this->conn->checkPayment($_GET['transaction_id']);
+		if ($this->conn->getPaidStatus())
+			$msg = $instance['thanks'];
+		else
+			$msg = $instance['sorry'];
+		printf("<p>%s</p>", $msg);
+	}
+
+	private function handle_payment($instance)
+	{
+		$amount = (int)((float)($_POST['amount']) * 100);
+		$this->connect($instance);
+		if ($this->conn->createPayment(
+			$_POST['bank'],
+			$amount,
+			$instance['description'],
+			$_SERVER['HTTP_REFERER'],
+			$instance['report_url']))
+		{
+			wp_redirect($this->conn->getBankURL());
+			exit;
+		} else {
+			echo "<p>Betaling kon niet worden aangemaakt.</p>";
+			echo "<p>" . htmlspecialchars($this->conn->getErrorMessage()) . "</p>";
+			exit;
+		}
+	}
+
+
+	private function select_bank($instance)
+	{
+		$this->connect($instance);
+		$banks = $this->conn->getBanks();
+		if ($banks == false) {
+			echo "<p>Er is een fout opgetreden</p>";
+			return;
+		}
+?>
+		<form id="select_bank_form" method="post">
+		<input type="hidden" name="amount" value="<?php echo $_POST['amount']; ?>"/>
+		<select name="bank">
+		<option value="">Kies uw bank</option>
+<?php
+		foreach($banks as $id=>$name) {
+			printf("<option value=\"%s\">%s</option>",
+				htmlspecialchars($id),
+				htmlspecialchars($name)); 
+		}
+?>
+		</select>
+		<input type="submit" value="Betalen"?>
+		</form>
+<?php
+	}
+
 	public function widget($args, $instance)
 	{
 		extract($args);
@@ -47,55 +100,15 @@ class Simple_Donate_Mollie extends WP_Widget {
 			echo $before_title . $title . $after_title;
 
 		if ($_GET['transaction_id']) {
-			$this->handle_return($args, $instance);
+			$this->handle_return($instance);
 			echo $after_widget;
 			return;
 		}
 
-		$iDeal = new Mollie_iDEAL_Payment($instance['partner_id']);
-		if ($instance['debug'])
-			$iDeal->setTestMode();
-
 		if (isset($_POST['bank']) and ! empty($_POST['bank'])) {
-			$amount = (int)((float)($_POST['amount']) * 100);
-			if ($iDeal->createPayment(
-				$_POST['bank'],
-				$amount,
-				$instance['description'],
-				$_SERVER['HTTP_REFERER'],
-				$instance['report_url']))
-			{
-				wp_redirect($iDeal->getBankURL());
-				exit;
-			} else {
-				echo "<p>Betaling kon niet worden aangemaakt.</p>";
-				echo "<p>" . htmlspecialchars($iDeal->getErrorMessage()) . "</p>";
-				exit;
-			}
-
+			$this->handle_payment($instance);
 		} else if (isset($_POST['amount'])) {
-			$banks = $iDeal->getBanks();
-			if ($banks == false) {
-				echo "<p>Er is een fout opgetreden</p>";
-				echo $after_widget;
-				return;
-			}
-?>
-		<form method="post">
-		<input type="hidden" name="amount" value="<?php echo $_POST['amount']; ?>"/>
-		<select name="bank">
-		<option value="">Kies uw bank</option>
-<?php
-			foreach($banks as $id=>$name) {
-?>
-				<option value="<?php echo htmlspecialchars($id) ?>"><?php echo htmlspecialchars($name) ?></option>
-<?
-			}
-?>
-		</select>
-		<input type="submit" value="Betalen"?>
-		</form>
-<?
+			$this->select_bank($instance);
 		} else {
 ?>
 		<form method="post">
@@ -191,8 +204,6 @@ class Simple_Donate_Mollie extends WP_Widget {
 	<input class="widefat" id="<?php echo $this->get_field_id('debug');?>" name="<?php echo $this->get_field_name('debug'); ?>"
 		type="checkbox" <?php echo $debug?"checked":"" ?> />
 	</p>
-
-
 <?
 	}
 
