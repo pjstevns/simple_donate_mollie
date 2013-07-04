@@ -53,7 +53,8 @@ class Simple_Donate_Mollie extends WP_Widget {
 		}
 
 		$iDeal = new Mollie_iDEAL_Payment($instance['partner_id']);
-		$iDeal->setTestMode();
+		if ($instance['debug'])
+			$iDeal->setTestMode();
 
 		if (isset($_POST['bank']) and ! empty($_POST['bank'])) {
 			$amount = (int)((float)($_POST['amount']) * 100);
@@ -62,7 +63,7 @@ class Simple_Donate_Mollie extends WP_Widget {
 				$amount,
 				$instance['description'],
 				$_SERVER['HTTP_REFERER'],
-				'http://www.nfg.nl/'))
+				$instance['report_url']))
 			{
 				wp_redirect($iDeal->getBankURL());
 				exit;
@@ -126,6 +127,11 @@ class Simple_Donate_Mollie extends WP_Widget {
 		} else {
 			$description = __('Description transaction', 'simple_donate');
 		}
+		if (isset($instance['report_url'])) {
+			$report_url = $instance['report_url'];
+		} else {
+			$report_url = __('Report URL', 'simple_donate');
+		}
 		if (isset($instance['thanks'])) {
 			$thanks = $instance['thanks'];
 		} else {
@@ -136,6 +142,12 @@ class Simple_Donate_Mollie extends WP_Widget {
 		} else {
 			$sorry = __('"Sorry" message', 'simple_donate');
 		}
+		if (isset($instance['debug'])) {
+			$debug = $instance['debug'];
+		} else {
+			$debug = true;
+		}
+
 
 ?>
 	<p>
@@ -143,15 +155,23 @@ class Simple_Donate_Mollie extends WP_Widget {
 	<input class="widefat" id="<?php echo $this->get_field_id('title');?>" name="<?php echo $this->get_field_name('title'); ?>"
 		type="text" value="<?php echo esc_attr($title); ?>" />
 	</p>
+
 	<p>
 	<label for="<?php echo $this->get_field_name('partner_id'); ?>"><?php _e('Partner ID:'); ?></label>
 	<input class="widefat" id="<?php echo $this->get_field_id('partner_id');?>" name="<?php echo $this->get_field_name('partner_id'); ?>"
 		type="text" value="<?php echo esc_attr($partner_id); ?>" />
 	</p>
+
 	<p>
 	<label for="<?php echo $this->get_field_name('description'); ?>"><?php _e('Description transaction:'); ?></label>
 	<input class="widefat" id="<?php echo $this->get_field_id('description');?>" name="<?php echo $this->get_field_name('description'); ?>"
 		type="text" value="<?php echo esc_attr($description); ?>" />
+	</p>
+
+	<p>
+	<label for="<?php echo $this->get_field_name('report_url'); ?>"><?php _e('Report URL:'); ?></label>
+	<input class="widefat" id="<?php echo $this->get_field_id('report_url');?>" name="<?php echo $this->get_field_name('report_url'); ?>"
+		type="text" value="<?php echo esc_attr($report_url); ?>" />
 	</p>
 
 	<p>
@@ -166,6 +186,12 @@ class Simple_Donate_Mollie extends WP_Widget {
 		type="text" value="<?php echo esc_attr($sorry); ?>" />
 	</p>
 
+	<p>
+	<label for="<?php echo $this->get_field_name('debug'); ?>"><?php _e('Test mode'); ?></label>
+	<input class="widefat" id="<?php echo $this->get_field_id('debug');?>" name="<?php echo $this->get_field_name('debug'); ?>"
+		type="checkbox" <?php echo $debug?"checked":"" ?> />
+	</p>
+
 
 <?
 	}
@@ -175,9 +201,11 @@ class Simple_Donate_Mollie extends WP_Widget {
 		$instance = array();
 		$instance['title'] = (! empty($new_instance['title'])) ? strip_tags($new_instance['title']): '';
 		$instance['partner_id'] = (! empty($new_instance['partner_id'])) ? strip_tags($new_instance['partner_id']): '';
+		$instance['report_url'] = (! empty($new_instance['report_url'])) ? strip_tags($new_instance['report_url']): '';
 		$instance['description'] = (! empty($new_instance['description'])) ? strip_tags($new_instance['description']): '';
 		$instance['thanks'] = (! empty($new_instance['thanks'])) ? strip_tags($new_instance['thanks']): '';
 		$instance['sorry'] = (! empty($new_instance['sorry'])) ? strip_tags($new_instance['sorry']): '';
+		$instance['debug'] = (! empty($new_instance['debug'])) ? true : false;
 		return $instance;
 	}
 }
